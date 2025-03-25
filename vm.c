@@ -1,4 +1,4 @@
-#define STACK_MAX 256;
+#define STACK_MAX 256
 
 typedef enum {
 	OBJ_INT,
@@ -17,11 +17,11 @@ typedef struct sObject {
 		
 		/* OBJ_PAIR */
 		struct {
-			sObject* head;
-			sObject* tail;
-		}
-	}
-}
+			struct sObject* tail;
+			struct sObject* head;
+		};
+	};
+} Object;
 
 // Define VM structure 
 // stack is an array of Object pointers with size STACK_MAX
@@ -52,7 +52,7 @@ void push(VM* vm, Object* value) {
 // Nothing is removed from memory
 // The returned item is the item that has been 'popped' off, because indexes start from 0.
 // Eg. if stackSize decrements from 3 to 2, it returns stack[2], which is the 3rd item.
-void pop(VM* vm) {
+Object* pop(VM* vm) {
 	assert(vm->stackSize > 0, "Stack underflow!");
 	return vm->stack[--vm->stackSize];
 }
@@ -82,7 +82,7 @@ void pushInt(VM* vm, int intValue) {
 // Return the new pair
 Object* pushPair(VM* vm) {
 	Object* object = newObject(vm, OBJ_PAIR);
-	object->trail = pop(vm);
+	object->tail = pop(vm);
 	object->head = pop(vm);
 	
 	push(vm, object);
