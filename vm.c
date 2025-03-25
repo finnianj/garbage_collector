@@ -21,6 +21,8 @@ typedef struct sObject {
 			struct sObject* head;
 		};
 	};
+
+	unsigned char marked;
 } Object;
 
 // Define VM structure 
@@ -61,6 +63,7 @@ Object* pop(VM* vm) {
 Object* newObject(VM* vm, ObjectType type) {
 	Object* object = malloc(sizeof(Object));
 	object->type = type;
+	object->marked = 0;
 	return object;
 }
 
@@ -89,3 +92,24 @@ Object* pushPair(VM* vm) {
 	return object;
 }
 
+// Mark function
+void mark(Object* object) {
+	// If already marked, return, otherwise objects could point to each other in a loop
+	if (object-> marked) return;
+
+	// Mark object
+	object->marked = 1;
+
+	// Recursively mark any objects that can be reached through this object
+	if (object->type = OBJ_PAIR) {
+		mark(object->head);
+		mark(object->tail);
+	}
+}
+
+// Mark all 
+void markAll(VM* vm) {
+	for (int i = 0; i < vm->stackSize; i++) {
+		mark(vm->stack[i]);
+	}
+}
