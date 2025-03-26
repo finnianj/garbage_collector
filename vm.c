@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 #define STACK_MAX 256
 #define INITIAL_GC_THRESHHOLD 100
 
@@ -56,7 +58,10 @@ VM* newVM() {
 
 // Function to push new object pointer to stack
 void push(VM* vm, Object* value) {
-	assert(vm->stackSize < STACK_MAX, "Stack overflow!");
+	if (vm->stackSize >= STACK_MAX) {
+		fprintf(stderr, "Stack overflow!\n");
+		exit(1);
+	}
 	vm->stack[vm->stackSize++] = value;
 }
 
@@ -66,9 +71,20 @@ void push(VM* vm, Object* value) {
 // The returned item is the item that has been 'popped' off, because indexes start from 0.
 // Eg. if stackSize decrements from 3 to 2, it returns stack[2], which is the 3rd item.
 Object* pop(VM* vm) {
-	assert(vm->stackSize > 0, "Stack underflow!");
-	return vm->stack[--vm->stackSize];
+	if (vm->stackSize == 0) {
+		fprintf(stderr, "Stack underflow!\n");
+		exit(1);
+	}
+	// Get the object that will be popped
+	Object* object = vm->stack[--vm->stackSize];
+
+	// Print the object being popped (for debugging)
+	printf("[POP] Popped object: %p, Type: %d\n", (void*)object, object->type);
+
+	return object;
 }
+
+void gc(VM* vm); // Function prototype
 
 // Function to add new object
 Object* newObject(VM* vm, ObjectType type) {
@@ -84,6 +100,8 @@ Object* newObject(VM* vm, ObjectType type) {
 	vm->firstObject = object;
 
 	vm->numObjects++;
+
+	printf("[ALLOC] Object created: %p, Total Objects: %d\n", (void*)object, vm->numObjects);
 	return object;
 }
 
@@ -121,7 +139,7 @@ void mark(Object* object) {
 	object->marked = 1;
 
 	// Recursively mark any objects that can be reached through this object
-	if (object->type = OBJ_PAIR) {
+	if (object->type == OBJ_PAIR) {
 		mark(object->head);
 		mark(object->tail);
 	}
@@ -152,6 +170,7 @@ void sweep(VM* vm)
 			*object = unreached->next;
 
 			// Free the unmarked object from memory
+			printf("[FREE] Object at: %p\n", (void*)unreached);
 			free(unreached);
 			vm->numObjects--;
 		} else {
@@ -165,8 +184,38 @@ void sweep(VM* vm)
 }
 
 void gc(VM* vm) {
+	printf("\n[GC START] Allocated: %d, Threshold: %d\n", vm->numObjects, vm->maxObjects);
+
+	int before = vm->numObjects;
+
 	markAll(vm);
 	sweep(vm);
 
-	vm->maxObjects = vm->numObjects * 2;
+	int after = vm->numObjects;
+	vm->maxObjects = after * 2;
+
+	printf("[GC END] Freed: %d, Remaining: %d, New Threshold: %d\n\n", before - after, after, vm->maxObjects);
+}
+
+int main() {
+	VM* vm = newVM();
+
+	// Push 80 int's
+	for (int i = 0; i < 80; i++) {
+		pushInt(vm, i);
+	}
+	
+	// Pop some off the VM stack
+	for (int i = 0; i < 10; i++) {
+		pop(vm);
+	}
+	
+	// Trigger garbage collection
+	for (int i = 0; i < 31; i++) {
+		pushInt(vm, i);
+	}
+
+	printf("Done allocating objects!\n");
+
+	return 0;
 }
