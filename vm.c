@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #define STACK_MAX 256
+#define INITIAL_GC_THRESHHOLD 100
 
 typedef enum {
 	OBJ_INT,
@@ -35,6 +36,9 @@ typedef struct {
 	Object* firstObject; // Most recently allocated object
 	Object* stack[STACK_MAX];
 	int stackSize;
+
+	int numObjects;
+	int maxObjects; // Number of objects required to trigger a garbage collection
 } VM;
 
 // Function to create new VM
@@ -45,6 +49,8 @@ VM* newVM() {
 	VM* vm = malloc(sizeof(VM));
 	vm->stackSize = 0;
 	vm->firstObject = NULL;
+	vm->numObjects = 0;
+	vm->maxObjects = INITIAL_GC_THRESHHOLD;
 	return vm;
 }
 
@@ -66,6 +72,9 @@ Object* pop(VM* vm) {
 
 // Function to add new object
 Object* newObject(VM* vm, ObjectType type) {
+	// Run GC if reached max objects
+	if (vm->numObjects == vm->maxObjects) gc(vm);
+
 	Object* object = malloc(sizeof(Object));
 	object->type = type;
 	object->marked = 0;
@@ -74,6 +83,7 @@ Object* newObject(VM* vm, ObjectType type) {
 	object->next = vm->firstObject;
 	vm->firstObject = object;
 
+	vm->numObjects++;
 	return object;
 }
 
@@ -143,6 +153,7 @@ void sweep(VM* vm)
 
 			// Free the unmarked object from memory
 			free(unreached);
+			vm->numObjects--;
 		} else {
 			// Object is marked. Unmark object.
 			(*object)->marked = 0;
@@ -151,4 +162,11 @@ void sweep(VM* vm)
 			object = &(*object)->next;
 		}
 	}
+}
+
+void gc(VM* vm) {
+	markAll(vm);
+	sweep(vm);
+
+	vm->maxObjects = vm->numObjects * 2;
 }
