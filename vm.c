@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #define STACK_MAX 256
 
 typedef enum {
@@ -9,6 +10,8 @@ typedef enum {
 // Then it has a union to hold the data for the int or pair. 
 // A union is a struct where the fields overlap in memory. Since a given object can only be an int or a pair, there’s no reason to have memory in a single object for all three fields at the same time. A union does that. 
 typedef struct sObject {
+	struct sObject* next; // Pointer to next object in allocated list
+
 	ObjectType type;
 	
 	union {
@@ -29,6 +32,7 @@ typedef struct sObject {
 // stack is an array of Object pointers with size STACK_MAX
 // stackSize represents the current size of the stack
 typedef struct {
+	Object* firstObject; // Most recently allocated object
 	Object* stack[STACK_MAX];
 	int stackSize;
 } VM;
@@ -40,6 +44,7 @@ typedef struct {
 VM* newVM() {
 	VM* vm = malloc(sizeof(VM));
 	vm->stackSize = 0;
+	vm->firstObject = NULL;
 	return vm;
 }
 
@@ -64,6 +69,11 @@ Object* newObject(VM* vm, ObjectType type) {
 	Object* object = malloc(sizeof(Object));
 	object->type = type;
 	object->marked = 0;
+
+	// Assign new object to head of object allocation list and assign previous head to the next prop of the new object
+	object->next = vm->firstObject;
+	vm->firstObject = object;
+
 	return object;
 }
 
@@ -111,5 +121,34 @@ void mark(Object* object) {
 void markAll(VM* vm) {
 	for (int i = 0; i < vm->stackSize; i++) {
 		mark(vm->stack[i]);
+	}
+}
+
+
+// Sweep
+// Example: vm->firstObject is stored at address 0x400 and contains 0x100, which is the addrss of object 1. object is initialised to contain 0x400.
+// Let's say object 1 is marked. Since object is 0x400, *object is 0x100. So (*object)->marked = true. That mean we unamrk it and set object to be &(*object)->next, which is the address of Object 1's next pointer, e.g 0x110. 0x100 contains the value 0x200 (the address of object 2).
+// Now object = 0x110 (Obj 1's next address) and *object = 0x200 (Obj 2's address). Let's say Obj 2 is unmarked, so (*object)->marked = false. We create a new pointer unreached and set it to be 0x200, the address of Obj 2. Then we set *object (Obj 1's next value) to be unreached->next, whicih is 0x300, the address of Obj 3.
+// So now, object is still 0x110, but 0x110 stores the address of Obj 3, 0x300. We have updated the list to skip out Obj 2. Finally, we free the memory at 0x200.
+void sweep(VM* vm)
+{
+	Object** object = &vm->firstObject;
+	while (*object) {
+		if (!(*object)->marked) {
+			// Object not marked. Save the address of the unmarked object in unreached
+			Object* unreached = *object;
+
+			// Adjust the current object pointer to contain the address of the next item in the list.
+			*object = unreached->next;
+
+			// Free the unmarked object from memory
+			free(unreached);
+		} else {
+			// Object is marked. Unmark object.
+			(*object)->marked = 0;
+
+			// Adjust object pointer to point to the address of current object's next pointer.
+			object = &(*object)->next;
+		}
 	}
 }
