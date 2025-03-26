@@ -197,6 +197,8 @@ void gc(VM* vm) {
 	printf("[GC END] Freed: %d, Remaining: %d, New Threshold: %d\n\n", before - after, after, vm->maxObjects);
 }
 
+
+// DEMO: Run the program 
 int main() {
 	VM* vm = newVM();
 
@@ -210,8 +212,8 @@ int main() {
 		pop(vm);
 	}
 	
-	// Trigger garbage collection
-	for (int i = 0; i < 31; i++) {
+	// Trigger garbage collection by exceeding 100 allocated objects
+	for (int i = 0; i < 21; i++) {
 		pushInt(vm, i);
 	}
 
